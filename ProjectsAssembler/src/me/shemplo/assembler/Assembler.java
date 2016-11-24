@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 
 import me.shemplo.assembler.file.ConstantsReader;
 import me.shemplo.assembler.file.PropertiesReader;
+import me.shemplo.assembler.structs.PackageTree;
 import me.shemplo.assembler.structs.Pair;
 
 public class Assembler {
@@ -74,6 +75,7 @@ public class Assembler {
 	public void getInstructions () {
 		String  line       = "";
 		int     lineNumber = 0;
+		boolean wasStopped = false;
 		
 		reader:
 		while ((line = propertiesReader.readLine ()) != null) {
@@ -88,6 +90,7 @@ public class Assembler {
 				
 				if (tmp == Sections.UNKNOWN) {
 					System.out.println ("[ERROR] Unknown section `" + sect + "` ... PARSE FAILED");
+					wasStopped = true;
 					break reader;
 				} else {
 					System.out.println ("[PROCESS] Section `" + sect + "` found");
@@ -187,6 +190,7 @@ public class Assembler {
 						continue;
 					} else if (command.toLowerCase ().equals ("create")) {
 						if (!_registerVariable (commands, lineNumber + 1)) {
+							wasStopped = true;
 							break reader;
 						}
 						
@@ -224,17 +228,64 @@ public class Assembler {
 			}
 		}
 		
-		if (showDebug) {
-			System.out.println ("[DEBUG] Constants gegistered...");
-		}
+		if (showDebug) { System.out.println ("[DEBUG] Constants gegistered..."); }
+		if (showDebug) { System.out.println ("[DEBUG] Properies read..."); }
 		
-		readInstructionsStatus = true;
+		if (!wasStopped) {
+			readInstructionsStatus = true;
+		}
 	}
 	
+	private HashMap <String, String> pathes;
+	
 	public void assemble () {
+		if (showDebug) { System.out.println ("[DEBUG] Starting assembly..."); }
 		
+		boolean wasStopped = false;
 		
-		runInstructionsStatus = true;
+		pathes = new HashMap <> ();
+		
+		assembler:
+		for (int i = 0; i < assemblerInstructions.size (); i ++) {
+			String [] commands = assemblerInstructions.get (i).f;
+			int       line     = assemblerInstructions.get (i).s;
+			
+			String variable = commands [0].toLowerCase ();
+			if (variables.containsKey (variable)) {
+				Types type = variables.get (variable);
+				
+				if (type == Types.PACKAGE) {
+					if (!pathes.containsKey (variable)) {
+						pathes.put (variable, variable);
+					}
+					
+					if (commands.length >= 2) {
+						String action = commands [1];
+						
+						if (action.equals ("+") || action.equals ("import")) {
+							new PackageTree ("Main").addPackage ("ch1.ch2", "newDir1");
+						}
+					} else {
+						System.out.println ("[ERROR] Not enough argument for command"
+												+ " in line " + line + " ... ignore command");
+						System.out.println ("[FORMAT] This command format: [id name] [action] [argument]");
+						
+						wasStopped = true;
+						break assembler;
+					}
+				}
+			} else {
+				System.out.println ("[ERROR] Constant `" + variable
+										+ "` was not created before"
+										+ " in line " + line + " ... ASSEBLY FAILED");
+				wasStopped = true;
+				break assembler;
+			}
+		}
+		
+		if (!wasStopped) {
+			runInstructionsStatus = true;
+		}
 	}
 	
 	private Sections _fetchSection (String command) {

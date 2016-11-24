@@ -15,7 +15,7 @@ public class ProjectsAssembler {
 		assembler.getInstructions ();
 		if (!assembler.getStatus ("readInstructionsStatus")) { return; }
 		
-		
+		assembler.assemble ();
 	}
 	
 }

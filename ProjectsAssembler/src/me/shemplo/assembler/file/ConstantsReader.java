@@ -51,11 +51,15 @@ public class ConstantsReader {
 		String realPath = path;
 		if (path.charAt (path.length () - 1) != '/' && path.charAt (path.length () - 1) != '\\') {
 			int position = Math.max (path.lastIndexOf ('/'), path.lastIndexOf ('\\'));
-			if (position != -1) { realPath = path.substring (0, position); }
+			if (position != -1) { realPath = path.substring (0, position) + "/assembler"; }
 		}		
 		
 		consts.put ("ASSEMBLER_DIR", realPath);
 		//consts.put ("ASSEMBLER_DIR", "Hello");
+		
+		consts.put ("SANDBOX_DIR", realPath + "/sandbox");
+		consts.put ("TARGET_DIR", realPath + "/target");
+		consts.put ("LOG_DIR", realPath + "/logs");
 	}
 	
 	private void _parseConstants () throws IOException {
