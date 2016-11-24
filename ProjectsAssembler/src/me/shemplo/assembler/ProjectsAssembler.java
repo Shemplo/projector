@@ -8,8 +8,14 @@ public class ProjectsAssembler {
 	
 	public static void main (String [] args) {
 		assembler = new Assembler ();
+		
 		assembler.setPropertiesFileName (PROPERTIES_FILE);
-		assembler.getInstructions       ();
+		if (!assembler.getStatus ("getPropertiesFileStatus")) { return; }
+		
+		assembler.getInstructions ();
+		if (!assembler.getStatus ("readInstructionsStatus")) { return; }
+		
+		
 	}
 	
 }

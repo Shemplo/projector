@@ -17,6 +17,11 @@ public class ConstantsReader {
 	
 	private HashMap <String, String> consts;
 	
+	public ConstantsReader () {
+		consts = new HashMap <> ();
+		_addDefaultConstants ();
+	}
+	
 	public ConstantsReader (String fileName) throws FileNotFoundException {
 		file = new FileReader (fileName);
 		
@@ -59,13 +64,13 @@ public class ConstantsReader {
 		
 		while ((string = reader.readLine ()) != null) {
 			String [] commands = Assembler.compressString (string);
-			_registerConstant (commands, lineNumber + 1);
+			registerConstant (commands, lineNumber + 1);
 			
 			lineNumber ++;
 		}
 	}
 	
-	private void _registerConstant (String [] commands, int line) {
+	public void registerConstant (String [] commands, int line) {
 		if (commands.length >= 3) {
 			if (commands.length > 3) {
 				System.out.println ("[WARNING] Unexpected symbols `" + commands [3] + "` found "
@@ -83,11 +88,21 @@ public class ConstantsReader {
 					if (nconst.charAt (1) == '+') {
 						String name = nconst.substring (2).toUpperCase ();
 						
-						if (!consts.containsKey (name)) {
-							nconstsFlag = true;
+						String mask = "^([A-Z0-9\\_]+)$";
+						Pattern pat = Pattern.compile (mask);
+						
+						Matcher matcher = pat.matcher (name.trim ());
+						if (matcher.matches ()) {
+							if (!consts.containsKey (name)) {
+								nconstsFlag = true;
+								nconst      = name;
+							} else {
+								System.out.println ("[ERROR] Constant `" + name + "` is already"
+														+ "registerd. Line: " + line + " ... ignore it");
+							}
 						} else {
-							System.out.println ("[ERROR] Constant `" + name + "` is already"
-													+ "registerd. Line: " + line + " ... ignore it");
+							System.out.println ("[ERROR] Invalid character in constant name `" + nconst
+													+ "` in line " + line + " ... ignore it");
 						}
 					} else {
 						System.out.println ("[ERROR] Declaration of new constant"
@@ -96,7 +111,7 @@ public class ConstantsReader {
 					}
 				} else {
 					System.out.println ("[WARNING] Declaration of new constant "
-											+ "should start width `$` in line " + line);
+											+ "should start with `$` in line " + line);
 				}
 			} else {
 				System.out.println ("[ERROR] Too short declaration of constant command `" 
@@ -123,7 +138,7 @@ public class ConstantsReader {
 			
 			boolean valueFlag = false;
 			if (value.length () > 0) {
-				String mask = "^([a-zA-Z0-9\\$\\.\\,\\:\\!\\_\\/]+)$";
+				String mask = "^([a-zA-Z0-9\\-\\$\\.\\,\\:\\!\\_\\/]+)$";
 				Pattern pat = Pattern.compile (mask);
 				
 				Matcher matcher = pat.matcher (value.trim ());
@@ -142,7 +157,7 @@ public class ConstantsReader {
 				return;
 			}
 			
-			String finalValue = _putConstants (value, line);
+			String finalValue = putConstants (value, line);
 			if (finalValue != null) { consts.put (nconst, finalValue); }
 		} else {
 			System.out.println ("[ERROR] Not enough argument for creating constant"
@@ -151,7 +166,7 @@ public class ConstantsReader {
 		}
 	}
 	
-	private String _putConstants (String string, int line) {
+	public String putConstants (String string, int line) {
 		StringBuilder sb   = new StringBuilder ();
 		StringBuilder name = new StringBuilder ();
 		
