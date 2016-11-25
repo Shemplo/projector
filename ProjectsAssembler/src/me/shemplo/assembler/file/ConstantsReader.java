@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,11 +50,22 @@ public class ConstantsReader {
 							.getPath ()
 							.trim ();
 		
+		try {
+			path = URLDecoder.decode (path, "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			System.out.println ("[WARNING] Assembler path contains non-ASCII "
+									+ "chars that is unsupported by UTF-8");
+		}
+		
 		String realPath = path;
-		if (path.charAt (path.length () - 1) != '/' && path.charAt (path.length () - 1) != '\\') {
+		if (path.charAt (path.length () - 1) != '/' || path.charAt (path.length () - 1) != '\\') {
 			int position = Math.max (path.lastIndexOf ('/'), path.lastIndexOf ('\\'));
 			if (position != -1) { realPath = path.substring (0, position) + "/assembler"; }
-		}		
+		}
+		
+		if (path.charAt (0) == '/' || path.charAt (0) == '\\') {
+			realPath = realPath.substring (1);
+		}
 		
 		consts.put ("ASSEMBLER_DIR", realPath);
 		//consts.put ("ASSEMBLER_DIR", "Hello");
@@ -142,7 +155,7 @@ public class ConstantsReader {
 			
 			boolean valueFlag = false;
 			if (value.length () > 0) {
-				String mask = "^([a-zA-Z0-9\\-\\$\\.\\,\\:\\!\\_\\/]+)$";
+				String mask = "^([à-ÿÀ-ßa-zA-Z0-9\\-\\$\\.\\,\\:\\!\\_\\/]+)$";
 				Pattern pat = Pattern.compile (mask);
 				
 				Matcher matcher = pat.matcher (value.trim ());
@@ -191,10 +204,10 @@ public class ConstantsReader {
 					name.setLength (0);
 					int start = i + 2;
 					i = start;
-					char seq;
+					char seq = 0;
 					
-					while (Character.isUpperCase (seq = string.charAt (i))
-							|| Character.isDigit (seq) || (seq) == '_') {;
+					while (i < string.length () && (Character.isUpperCase (seq = string.charAt (i))
+							|| Character.isDigit (seq) || (seq) == '_')) {;
 						name.append (seq);
 						i ++;
 					}

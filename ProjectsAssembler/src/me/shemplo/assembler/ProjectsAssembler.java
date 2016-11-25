@@ -6,7 +6,7 @@ public class ProjectsAssembler {
 	
 	private static Assembler assembler;
 	
-	public static void main (String [] args) {
+	public static void main (String [] args) throws Exception {
 		assembler = new Assembler ();
 		
 		assembler.setPropertiesFileName (PROPERTIES_FILE);

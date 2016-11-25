@@ -1,5 +1,6 @@
 package me.shemplo.assembler;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -161,7 +162,7 @@ public class Assembler {
 					
 					if (command.toLowerCase ().equals ("debug")) {
 						if (commands.length == 1) {
-							System.out.println ("[ERROR] Not enough argument for command `" + command
+							System.out.println ("[ERROR] Not enough arguments for command `" + command
 													+ "` in line " + (lineNumber + 1)
 													+ " ... ignore command");
 							System.out.println ("[FORMAT] This command format: debug [show|hide]");
@@ -242,7 +243,6 @@ public class Assembler {
 		if (showDebug) { System.out.println ("[DEBUG] Starting assembly..."); }
 		
 		boolean wasStopped = false;
-		
 		pathes = new HashMap <> ();
 		
 		assembler:
@@ -263,7 +263,112 @@ public class Assembler {
 						String action = commands [1];
 						
 						if (action.equals ("+") || action.equals ("import")) {
-							new PackageTree ("Main").addPackage ("ch1.ch2", "newDir1");
+							if (commands.length >= 3) {
+								Types itype    = Types.UNKNOWN;
+								String value   = "";
+								String to      = "";
+								
+								if (commands.length >= 3) {
+									String string  = commands [2];
+									
+									boolean typeGiven = false;
+									Types tempType = _fetchType (string);
+									
+									if (tempType != null) {
+										itype = tempType;
+										typeGiven = true;
+									} else {
+										value = constantsReader.putConstants (string, line);
+										value = value.toLowerCase ();
+										
+										if (!PackageTree.checkPath (value)) {
+											System.out.println ("[ERROR] Invalid source path `" + value 
+																	+ "` given in line " 
+																	+ line + " ... ADDING FAILED");
+											continue assembler;
+										}
+										
+										itype = _fetchTypeFromPath (value);
+									}
+									
+									if (typeGiven && commands.length >= 4) {
+										value = constantsReader.putConstants (commands [3], line);
+										value = value.toLowerCase ();
+										
+										if (!PackageTree.checkPath (value)) {
+											System.out.println ("[ERROR] Invalid source path `" + value 
+																	+ "` given in line " 
+																	+ line + " ... ADDING FAILED");
+											continue assembler;
+										}
+										
+										itype = _fetchTypeFromPath (value);
+									} else if (typeGiven && commands.length < 4) {
+										System.out.println ("[ERROR] Not enough arguments for command `" + action
+												+ "` in line " + line + " ... ignore command");
+										System.out.println ("[FORMAT] This command format: "
+																+ "[id name] [action] <[type]> [value]");
+									}
+									
+									if ((typeGiven && commands.length >= 6)
+											|| (!typeGiven && commands.length >= 5)) {
+										string = commands [3 + (typeGiven ? 1 : 0)];
+										if (string.equals ("to")) {
+											to = commands [4 + (typeGiven ? 1 : 0)];
+											to = constantsReader.putConstants (to, line);
+											to = to.toLowerCase ();
+											
+											if (!PackageTree.checkPath (to)) {
+												System.out.println ("[ERROR] Invalid source path `" + to 
+																		+ "` given in line " 
+																		+ line + " ... ADDING FAILED");
+												continue assembler;
+											}
+										} else {
+											System.out.println ("[ERROR] Action `" + string + "` is not supported"
+																	+ " in line " + line + " ... ADDING FAILED");
+											continue assembler;
+										}
+									} /*else if (typeGiven && commands.length < 6) {
+										System.out.println ("[ERROR] Not enough arguments for command `" + action
+												+ "` in line " + line + " ... ignore command");
+										System.out.println ("[FORMAT] This command format: "
+																+ "[id name] [action] <[type]> [value] to [package]");
+									}*/ else if (commands.length > 3 + (typeGiven ? 1 : 0)) {
+										System.out.println ("[WARNING] Unexpected symbols `" 
+																+ commands [3 + (typeGiven ? 1 : 0)] + "` found "
+																+ "near command `" + action + "` in line " + line
+																+ " ... ignore them");
+									}
+								} else {
+									System.out.println ("[ERROR] Not enough arguments for command `" + action
+											+ "` in line " + line + " ... ignore command");
+									System.out.println ("[FORMAT] This command format: "
+															+ "[id name] [action] <[type]> [value]");
+								}
+								
+								if (commands.length > 6) {
+									System.out.println ("[WARNING] Unexpected symbols `" + commands [5] + "` found "
+											+ "near command `" + action + "` in line " + line
+											+ " ... ignore them");
+								}
+								
+								if (itype == Types.UNKNOWN) {
+									System.out.println ("[ERROR] Unknown type given `" + commands [2]
+											+ "` in line " + line + " ... PARSE FAILED");
+									
+									continue assembler;
+								} else if (itype == Types.FILE) {
+									
+								}
+							} else {
+								System.out.println ("[ERROR] Not enough arguments for command"
+										+ " in line " + line + " ... ignore command");
+								System.out.println ("[FORMAT] This command format: [id name] [action] [argument]");
+								
+								wasStopped = true;
+								break assembler;
+							}
 						}
 					} else {
 						System.out.println ("[ERROR] Not enough argument for command"
@@ -312,6 +417,38 @@ public class Assembler {
 			return Types.FILE;
 		} else if (command.charAt (0) == '<' && command.charAt (command.length () - 1) == '>') {
 			return Types.UNKNOWN;
+		}
+		
+		return null;
+	}
+	
+	private Types _fetchTypeFromPath (String path) {
+		int pointer = path.lastIndexOf ('.');
+		
+		if (pointer == -1) {
+			boolean directoryExists = false;
+			
+			File directory = new File (path);
+			directoryExists = directory.exists () && directory.isDirectory ();
+			
+			if (!directoryExists) {
+				System.out.println ("[ERROR] Requested directory on path `" + path 
+										+ "` does not exist");
+			} else {
+				return Types.PACKAGE;
+			}
+		} else {
+			boolean fileExists = false;
+			
+			File file = new File (path);
+			fileExists = file.exists () && file.isFile ();
+			
+			if (!fileExists) {
+				System.out.println ("[ERROR] Requested file on path `" + path 
+										+ "` does not exist");
+			} else {
+				return Types.FILE;
+			}
 		}
 		
 		return null;
