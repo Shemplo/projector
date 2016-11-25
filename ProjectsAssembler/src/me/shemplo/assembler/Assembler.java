@@ -237,7 +237,7 @@ public class Assembler {
 		}
 	}
 	
-	private HashMap <String, String> pathes;
+	private HashMap <String, PackageTree> pathes;
 	
 	public void assemble () {
 		if (showDebug) { System.out.println ("[DEBUG] Starting assembly..."); }
@@ -256,7 +256,7 @@ public class Assembler {
 				
 				if (type == Types.PACKAGE) {
 					if (!pathes.containsKey (variable)) {
-						pathes.put (variable, variable);
+						pathes.put (variable, new PackageTree ());
 					}
 					
 					if (commands.length >= 2) {
@@ -358,8 +358,23 @@ public class Assembler {
 											+ "` in line " + line + " ... PARSE FAILED");
 									
 									continue assembler;
+								} else if (itype == Types.MANIFEST) {
+									System.out.println ("[ERROR] To add manifest file in jar use `set` "
+															+ " instead of `" + action + "` in line " + line
+															+ " ... ignore it");
+									continue assembler;
 								} else if (itype == Types.FILE) {
+									PackageTree root = pathes.get (variable);
+									String toLocal = _fetchLocalPath (variable, to, line);
 									
+									if (toLocal == null) {
+										wasStopped = true;
+										break assembler;
+									}
+									
+									root.addFile (toLocal, _fetchFileName (value), value);
+								} else if (itype == Types.PACKAGE) {
+									//STOP
 								}
 							} else {
 								System.out.println ("[ERROR] Not enough arguments for command"
@@ -430,6 +445,9 @@ public class Assembler {
 			
 			File directory = new File (path);
 			directoryExists = directory.exists () && directory.isDirectory ();
+			directoryExists = directoryExists 
+								|| (variables.containsKey (path) 
+										&& variables.get (path) == Types.PACKAGE);
 			
 			if (!directoryExists) {
 				System.out.println ("[ERROR] Requested directory on path `" + path 
@@ -451,6 +469,56 @@ public class Assembler {
 			}
 		}
 		
+		return null;
+	}
+	
+	private String _fetchLocalPath (String variable, String path, int line) {
+		if (path.charAt (0) == '.') {
+			if (path.length () >= 3) {
+				return path.substring (2);
+			}
+			
+			System.out.println ("[ERROR] Given local path `./` is not correct."
+									+ " Line: " + line);
+		} else {
+			StringBuilder sb = new StringBuilder ();
+			int pointer = -1;
+			
+			for (int i = 0; i < path.length (); i ++) {
+				char symbol = path.charAt (i);
+				
+				if (symbol == '/' || symbol == '\\') {
+					pointer = i;
+					break;
+				} else {
+					sb.append (symbol);
+				}
+			}
+			
+			if (pointer != -1) {
+				if (variable.equals (sb.toString ())) {
+					if (path.length () >= Math.min (pointer + 1, 3)) {
+						
+					} else {
+						System.out.println ("[ERROR] Given local path `" + variable + "/` is not correct."
+												+ " Line: " + line + " ... ADDING FAILED");
+					}
+				} else {
+					System.out.println ("[ERROR] Wrong variable given `" + variable + "` in local path"
+											+ " in line " + line + " ... ADDING FAILED");
+				}
+			} else {
+				System.out.println ("[WARNING] Root path was not found in local path `" + path 
+										+ "` in line " + line);
+				return path;
+			}
+		}
+		
+		return null;
+	}
+	
+	private String _fetchFileName (String path) {
+		//STOP
 		return null;
 	}
 	
