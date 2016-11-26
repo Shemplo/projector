@@ -275,6 +275,7 @@ public class Assembler {
 									Types tempType = _fetchType (string);
 									
 									if (tempType != null) {
+										System.out.println (variable + " " + action + " " + tempType);
 										itype = tempType;
 										typeGiven = true;
 									} else {
@@ -302,7 +303,7 @@ public class Assembler {
 											continue assembler;
 										}
 										
-										itype = _fetchTypeFromPath (value);
+										//itype = _fetchTypeFromPath (value);
 									} else if (typeGiven && commands.length < 4) {
 										System.out.println ("[ERROR] Not enough arguments for command `" + action
 												+ "` in line " + line + " ... ignore command");
@@ -342,16 +343,23 @@ public class Assembler {
 									}
 								} else {
 									System.out.println ("[ERROR] Not enough arguments for command `" + action
-											+ "` in line " + line + " ... ignore command");
+															+ "` in line " + line + " ... ignore command");
 									System.out.println ("[FORMAT] This command format: "
 															+ "[id name] [action] <[type]> [value]");
 								}
 								
 								if (commands.length > 6) {
 									System.out.println ("[WARNING] Unexpected symbols `" + commands [5] + "` found "
-											+ "near command `" + action + "` in line " + line
-											+ " ... ignore them");
+															+ "near command `" + action + "` in line " + line
+															+ " ... ignore them");
 								}
+								
+								if (itype == null) {
+									System.out.println ("[ERROR] Failed to fetch `" + value
+															+ "` type in line " + line + " ... PARSE FAILED");
+									wasStopped = true;
+									break assembler;
+								} 
 								
 								if (itype == Types.UNKNOWN) {
 									System.out.println ("[ERROR] Unknown type given `" + commands [2]
@@ -372,7 +380,14 @@ public class Assembler {
 										break assembler;
 									}
 									
-									root.addFile (toLocal, _fetchFileName (value), value);
+									String fileName = _fetchFileName (value, line);
+									
+									if (fileName == null) {
+										wasStopped = true;
+										break assembler;
+									}
+									
+									root.addFile (toLocal, fileName, value);
 								} else if (itype == Types.PACKAGE) {
 									//STOP
 								}
@@ -395,9 +410,9 @@ public class Assembler {
 					}
 				}
 			} else {
-				System.out.println ("[ERROR] Constant `" + variable
+				System.out.println ("[ERROR] Variable `" + variable
 										+ "` was not created before"
-										+ " in line " + line + " ... ASSEBLY FAILED");
+										+ " in line " + line + " ... ASSEMBLY FAILED");
 				wasStopped = true;
 				break assembler;
 			}
@@ -473,6 +488,10 @@ public class Assembler {
 	}
 	
 	private String _fetchLocalPath (String variable, String path, int line) {
+		if (path == null || path.length () == 0) {
+			return "";
+		}
+		
 		if (path.charAt (0) == '.') {
 			if (path.length () >= 3) {
 				return path.substring (2);
@@ -497,8 +516,9 @@ public class Assembler {
 			
 			if (pointer != -1) {
 				if (variable.equals (sb.toString ())) {
-					if (path.length () >= Math.min (pointer + 1, 3)) {
-						
+					int offset = Math.min (pointer + 1, 3);
+					if (path.length () >= offset) {
+						return path.substring (offset);
 					} else {
 						System.out.println ("[ERROR] Given local path `" + variable + "/` is not correct."
 												+ " Line: " + line + " ... ADDING FAILED");
@@ -517,9 +537,33 @@ public class Assembler {
 		return null;
 	}
 	
-	private String _fetchFileName (String path) {
-		//STOP
-		return null;
+	private String _fetchFileName (String path, int line) {
+		if (path == null || path.length () == 0) {
+			System.out.println ("[ERROR] Empty file name given in path `" + path 
+									+ "` in line " + line + " ... ADDING FAILED");
+			return null;
+		}
+		
+		int pointer = -1;
+		
+		for (int i = path.length () - 1; i >= 0; i --) {
+			char symbol = path.charAt (i);
+			
+			if (symbol == '/' || symbol == '\\') {
+				pointer = i;
+				break;
+			}
+		}
+		
+		if (pointer != -1 && pointer != path.length () - 1) {
+			return path.substring (pointer + 1);
+		} else if (pointer == path.length () - 1) {
+			System.out.println ("[ERROR] Empty file name given in path `" + path 
+									+ "` in line " + line + " ... ADDING FAILED");
+			return null;
+		}
+		
+		return path;
 	}
 	
 	private boolean _registerVariable (String [] commands, int line) {
@@ -630,8 +674,8 @@ public class Assembler {
 				operatorFlag = true;
 			} else {
 				System.out.println ("[ERROR] Unexpected operator `" + operator 
-						+ "` for registering property in line " + line
-						+ " ... ignore it");
+										+ "` for registering property in line " + line
+										+ " ... ignore it");
 				System.out.println ("[FORMAT] This command format: .[property name] = [value]");
 			}
 			
@@ -643,7 +687,7 @@ public class Assembler {
 			boolean valueFlag = false;
 			
 			if (value.length () > 0) {
-				String mask = "^([a-zA-Z0-9\\-\\$\\.\\,\\:\\!\\_\\/]+)$";
+				String mask = "^([à-ÿÀ-ßa-zA-Z0-9\\-\\$\\.\\,\\:\\!\\_\\/]+)$";
 				Pattern pat = Pattern.compile (mask);
 				
 				Matcher matcher = pat.matcher (value.trim ());

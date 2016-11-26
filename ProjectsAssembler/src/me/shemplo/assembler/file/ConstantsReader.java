@@ -60,19 +60,20 @@ public class ConstantsReader {
 		String realPath = path;
 		if (path.charAt (path.length () - 1) != '/' || path.charAt (path.length () - 1) != '\\') {
 			int position = Math.max (path.lastIndexOf ('/'), path.lastIndexOf ('\\'));
-			if (position != -1) { realPath = path.substring (0, position) + "/assembler"; }
+			if (position != -1) { realPath = path.substring (0, position); }
 		}
 		
 		if (path.charAt (0) == '/' || path.charAt (0) == '\\') {
 			realPath = realPath.substring (1);
 		}
 		
-		consts.put ("ASSEMBLER_DIR", realPath);
+		consts.put ("SRC_DIR", realPath + "/src");
+		consts.put ("ASSEMBLER_DIR", realPath + "/assembler");
 		//consts.put ("ASSEMBLER_DIR", "Hello");
 		
-		consts.put ("SANDBOX_DIR", realPath + "/sandbox");
-		consts.put ("TARGET_DIR", realPath + "/target");
-		consts.put ("LOG_DIR", realPath + "/logs");
+		consts.put ("SANDBOX_DIR", realPath + "/assembler/sandbox");
+		consts.put ("TARGET_DIR", realPath + "/assembler/target");
+		consts.put ("LOG_DIR", realPath + "/assembler/logs");
 	}
 	
 	private void _parseConstants () throws IOException {

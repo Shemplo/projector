@@ -217,6 +217,7 @@ public class PackageTree {
 			} else {
 				path = path.toLowerCase ();
 				this.addPackagePath (path);
+				
 				Node node = this._getNode (path);
 				node.addFile ("", name, source);
 			}
