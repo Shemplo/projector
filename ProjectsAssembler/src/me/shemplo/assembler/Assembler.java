@@ -245,6 +245,7 @@ public class Assembler {
 		}
 	}
 	
+	private ArrayList <String>                         pack;
 	private HashMap <String, PackageTree>              pathes;
 	private HashMap <String, HashMap <String, String>> manifests;
 	
@@ -252,6 +253,7 @@ public class Assembler {
 		if (showDebug) { System.out.println ("[DEBUG] Starting assembly..."); }
 		
 		boolean wasStopped = false;
+		pack      = new ArrayList <> ();
 		pathes    = new HashMap <> ();
 		manifests = new HashMap <> ();
 		
@@ -499,6 +501,21 @@ public class Assembler {
 														+ " in line " + line + " ... ignore command");
 								System.out.println ("[FORMAT] This command format: [id name] set <[type]> [id name2]");
 							}
+						} else if (action.equals ("pack")) {
+							boolean is = false;
+							for (int j = 0; j < pack.size (); j ++) {
+								if (pack.get (j).equals (variable)) {
+									is = true;
+									break;
+								}
+							}
+							
+							if (!is) {
+								pack.add (variable);
+								System.out.println ("[DEBUG] >> Package `" + variable + "` will be packed");
+							} else {
+								
+							}
 						} else {
 							System.out.println ("[ERROR] Requested method `" + action
 													+ "` is not supported in line " + line
@@ -533,6 +550,51 @@ public class Assembler {
 	
 	public void buildSandbox () {
 		if (showDebug) { System.out.println ("[DEBUG] Starting building sandbox..."); }
+		
+		String assemblerDir = constantsReader.putConstants ("$.ASSEMBLER_DIR", 0);
+		File assembler = new File (assemblerDir);
+		
+		if (assembler.exists ()) {
+			if (showDebug) {
+				System.out.println ("[DEBUG] Clearing assembler directory...");
+			}
+			
+			PackageTree.clearDirectory (assembler, 0);
+		}
+		
+		////////////////////
+		assembler.mkdirs ();
+		////////////////////
+		
+		String sandBoxDir = constantsReader.putConstants ("$.SANDBOX_DIR", 0);
+		String targetDir  = constantsReader.putConstants ("$.TARGET_DIR", 0);
+		String logsDir    = constantsReader.putConstants ("$.LOGS_DIR", 0);
+		
+		File sandBox = new File (sandBoxDir);
+		File target  = new File (targetDir);
+		File logs    = new File (logsDir);
+		
+		//////////////////
+		sandBox.mkdirs ();
+		target.mkdirs  ();
+		logs.mkdirs    ();
+		//////////////////
+		
+		builder:
+		for (int i = 0; i < pack.size (); i ++) {
+			String name = pack.get (i);
+			
+			File root = new File (sandBox.getAbsolutePath () + File.separatorChar + name);
+			root.mkdir ();
+			
+			if (showDebug) { System.out.println ("[DEBUG] Package `" + name + "` is created"); }
+			
+			if (!pathes.get (name).buildDirectoryFromTree (root)) {
+				break builder;
+			}
+			
+			
+		}
 	}
 	
 	private Sections _fetchSection (String command) {

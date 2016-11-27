@@ -1,6 +1,7 @@
 package me.shemplo.assembler.structs;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -154,6 +155,47 @@ public class PackageTree {
 		return built;
 	}
 	
+	public boolean buildDirectoryFromTree (File root) {
+		if (!root.exists ()) {
+			root.mkdir ();
+		}
+		
+		try {
+			this.root.buildDirectory (root); 
+			return true;
+		} catch (Exception e) {
+			System.out.println (e.getMessage ());
+			return false;
+		}
+	}
+	
+	public static boolean clearDirectory (File rootDir, int line) {
+		boolean cleared = false;
+		
+		if (rootDir.exists ()) {
+			if (rootDir.isDirectory ()) {
+				for (File tmp: rootDir.listFiles ()) {
+					cleared = PackageTree.clearDirectory (tmp, line) && cleared;
+					tmp.delete ();
+				}
+				
+				System.out.println ("[LOG] Directory `" + rootDir.getName () + "` deleted");
+				rootDir.delete ();
+			} else {
+				rootDir.delete ();
+				cleared = true;
+				
+				System.out.println ("[LOG] File `" + rootDir.getName () + "` deleted");
+			}
+		} else {
+			System.out.println ("[ERROR] Directory on path `" + rootDir.getAbsolutePath () 
+									+ "` is not found in line " + line
+									+ " ... ADDING FAILED");
+		}
+		
+		return cleared;
+	}
+	
 	private class Node {
 		
 		@SuppressWarnings ("unused")
@@ -289,6 +331,31 @@ public class PackageTree {
 			}
 			
 			return got;
+		}
+		
+		public void buildDirectory (File root) throws Exception {
+			packages.forEach ((key, value) -> {
+				File child = new File (root.getAbsolutePath () + File.separatorChar + key);
+				child.mkdir ();
+				
+				try                 { value.buildDirectory (child); } 
+				catch (Exception e) { e.printStackTrace (); }
+			});
+			
+			files.forEach ((key, value) -> {
+				File file = new File (value);
+				System.out.println ("[LOG] File " + file);
+				
+				if (file.exists ()) {
+					File dest = new File (root.getAbsolutePath () + File.separatorChar + key);
+					try                 { Files.copy (file.toPath (), dest.toPath ()); } 
+					catch (Exception e) { return; }
+				} else {
+					System.out.println ("[ERROR] File `" + key + "` does not exist on path `" 
+											+ value + "` ... BUILD FAILED");
+					return;
+				}
+			});
 		}
 	}
 	
