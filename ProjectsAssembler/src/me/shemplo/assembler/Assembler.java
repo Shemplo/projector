@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,7 +22,8 @@ public class Assembler {
 	private ArrayList <Pair <String [], Integer>> assemblerInstructions;
 	private ArrayList <Pair <String [], Integer>> applicationInstructions;
 	private HashMap   <String, Types>             variables;
-	private HashMap   <String, String>            properties;
+	private HashMap   <String, String>            appProperties;
+	private HashSet   <String>                    manfProperties;
 	
 	private boolean showDebug = false;
 	
@@ -54,7 +56,12 @@ public class Assembler {
 		this.assemblerInstructions   = new ArrayList <> ();
 		this.applicationInstructions = new ArrayList <> ();
 		this.variables               = new HashMap <> ();
-		this.properties              = new HashMap <> ();
+		this.appProperties           = new HashMap <> ();
+		this.manfProperties          = new HashSet <> ();
+		
+		this.manfProperties.add ("Manifest-Version");
+		this.manfProperties.add ("Main-Class");
+		this.manfProperties.add ("Created-By");
 		
 		this.section = Sections.UNKNOWN;
 	}
@@ -205,7 +212,7 @@ public class Assembler {
 					String command = commands [0];
 					
 					if (command.charAt (0) == '.') {
-						_registerProperty (commands, lineNumber + 1);
+						_registerApplicationProperty (commands, lineNumber + 1);
 					} else {
 						this.applicationInstructions.add (new Pair <String [], Integer> (commands, lineNumber + 1));
 					}
@@ -245,7 +252,8 @@ public class Assembler {
 		if (showDebug) { System.out.println ("[DEBUG] Starting assembly..."); }
 		
 		boolean wasStopped = false;
-		pathes = new HashMap <> ();
+		pathes    = new HashMap <> ();
+		manifests = new HashMap <> ();
 		
 		assembler:
 		for (int i = 0; i < assemblerInstructions.size (); i ++) {
@@ -478,10 +486,13 @@ public class Assembler {
 															+ "` in line " + line + " ... PARSE FAILED");
 									continue assembler;
 								} else if (itype == Types.MANIFEST) {
-									_registerVariable (new String [] {"create", "<manifest>", name}, line);
-									
-									manifests.put (name, new HashMap <> ());
-									manifests.get (name).put ("__PARENT__", variable);
+									if (_registerVariable (new String [] {"create", "<manifest>", name}, line)) {
+										pathes.get (variable).setManifest (name);
+										manifests.put (name, new HashMap <> ());
+										manifests.get (name).put ("__PARENT__", variable);
+									} else if (variables.containsKey (name)) {
+										pathes.get (variable).setManifest (name);
+									}
 								}
 							} else {
 								System.out.println ("[ERROR] Not enough arguments for command"
@@ -502,8 +513,9 @@ public class Assembler {
 						break assembler;
 					}
 				} else if (type == Types.MANIFEST) {
-					
-					//STOP
+					if (!_registerManifestProperty (commands, line)) {
+						continue assembler;
+					}
 				}
 			} else {
 				System.out.println ("[ERROR] Variable `" + variable
@@ -721,7 +733,7 @@ public class Assembler {
 		return registered;
 	}
 	
-	private boolean _registerProperty (String [] commands, int line) {
+	private boolean _registerApplicationProperty (String [] commands, int line) {
 		boolean registered = false;
 		
 		if (commands.length >= 3) {
@@ -743,7 +755,7 @@ public class Assembler {
 					
 					Matcher matcher = pat.matcher (name.trim ());
 					if (matcher.matches ()) {
-						if (properties.containsKey (name)) {
+						if (appProperties.containsKey (name)) {
 							System.out.println ("[WARNING] Property with name `" + name
 													+ "` is already registered. Line: " + line);
 						}
@@ -807,11 +819,115 @@ public class Assembler {
 			}
 			
 			String finalValue = constantsReader.putConstants (value, line);
-			if (finalValue != null) { properties.put (property, finalValue); }
+			if (finalValue != null) { appProperties.put (property, finalValue); }
 		} else {
 			System.out.println ("[ERROR] Not enough argument for registering property "
 					+ "in line " + line + " ... ignore command");
 			System.out.println ("[FORMAT] This command format: .[property name] = [value]");
+		}
+		
+		return registered;
+	}
+	
+	private boolean _registerManifestProperty (String [] commands, int line) {
+		boolean registered = false;
+		
+		if (commands.length >= 4) {
+			if (commands.length > 4) {
+				System.out.println ("[WARNING] Unexpected symbols `" + commands [4] + "` found "
+										+ "near command in line " + line
+										+ " ... ignore them");
+			}
+			
+			String manifest = commands [0];
+			String property = commands [1];
+			boolean propertyFlag = false;
+			
+			if (property.length () > 1) {
+				if (property.charAt (0) == '.') {
+					String name = property.substring (1);
+					
+					String mask = "^([a-zA-Z0-9\\_\\-]+)$";
+					Pattern pat = Pattern.compile (mask);
+					
+					Matcher matcher = pat.matcher (name.trim ());
+					if (matcher.matches ()) {
+						property = name;
+						
+						if (!manfProperties.contains (property)) {
+							System.out.println ("[WARNING] You used not default property `" 
+													+ property + "` in line " + line);
+						}
+						
+						if (!property.equals ("__PARENT__")) {
+							propertyFlag = true;
+						} else {
+							System.out.println ("[ERROR] Do not use reserved name `__PARENT__`"
+													+ " for property name in line " + line 
+													+ " ... ignore it");
+						}
+					} else {
+						System.out.println ("[ERROR] Invalid character in name `" + property
+												+ "` in line " + line + " ... ignore it");
+					}
+				} else {
+					System.out.println ("[WARNING] Declaration of property "
+											+ "should start with `.` in line " + line);
+				}
+			} else {
+				System.out.println ("[ERROR] Too short declaration of property `" 
+										+ property + "` in line " + line + " ... ignore it");
+			}
+			
+			if (!propertyFlag) {
+				return false;
+			}
+			
+			String operator = commands [2];
+			boolean operatorFlag = false;
+			
+			if (operator.equals ("=")) {
+				operatorFlag = true;
+			} else {
+				System.out.println ("[ERROR] Unexpected operator `" + operator 
+						+ "` for registering property in line " + line
+						+ " ... ignore it");
+				System.out.println ("[FORMAT] This command format: [id name] .[propery name] = [value]");
+			}
+			
+			if (!operatorFlag) {
+				return false;
+			}
+			
+			String value = commands [3];
+			boolean valueFlag = false;
+			
+			if (value.length () > 0) {
+				String mask = "^([à-ÿÀ-ßa-zA-Z0-9\\-\\$\\.\\,\\:\\!\\_\\/]+)$";
+				Pattern pat = Pattern.compile (mask);
+				
+				Matcher matcher = pat.matcher (value.trim ());
+				if (matcher.matches ()) {
+					valueFlag = true;
+				} else {
+					System.out.println ("[ERROR] Invalid character in value `" + value
+											+ "` in line " + line + " ... ignore it");
+				}
+			} else {
+				System.out.println ("[ERROR] Property can't have empty value "
+										+ "in line " + line + " ... ignore it");
+			}
+			
+			if (!valueFlag) {
+				return false;
+			}
+			
+			String finalValue = constantsReader.putConstants (value, line);
+			if (finalValue != null) { manifests.get (manifest).put (property, finalValue); }
+		} else {
+			System.out.println ("[ERROR] Not enough argument for command"
+									+ " in line " + line + " ... ignore command");
+			System.out.println ("[FORMAT] This command format: [id name] .[propery name] = [value]");
 		}
 		
 		return registered;

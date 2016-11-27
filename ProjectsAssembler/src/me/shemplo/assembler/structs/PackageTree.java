@@ -8,9 +8,19 @@ import java.util.regex.Pattern;
 public class PackageTree {
 	
 	private Node root;
+	private String manifest;
 	
 	public PackageTree () {
 		root = new Node ();
+	}
+	
+	public void setManifest (String manifest) {
+		assert manifest != null;
+		this.manifest = manifest;
+	}
+	
+	public String manifest (){
+		return manifest;
 	}
 	
 	public boolean addPackagePath (String path) {
