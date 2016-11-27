@@ -1,5 +1,6 @@
 package me.shemplo.assembler.structs;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -117,6 +118,30 @@ public class PackageTree {
 		return matcher.find ();
 	}
 	
+	public boolean buildTreeFromPath (String path, int line) {
+		boolean built = true;
+		
+		File rootDir = new File (path);
+		if (rootDir.exists ()) {
+			if (rootDir.isDirectory ()) {
+				built = root.getAllFromPath (rootDir);
+			} else {
+				System.out.println ("[ERROR] Directory on path `" + path
+										+ " is not a directory "
+										+ " in line " + line 
+										+ " ... ADDING FAILED");
+				built = false;
+			}
+		} else {
+			System.out.println ("[ERROR] Directory on path `" + path 
+									+ "` is not found in line " + line
+									+ " ... ADDING FAILED");
+			built = false;
+		}
+		
+		return built;
+	}
+	
 	private class Node {
 		
 		@SuppressWarnings ("unused")
@@ -221,6 +246,37 @@ public class PackageTree {
 				Node node = this._getNode (path);
 				node.addFile ("", name, source);
 			}
+		}
+		
+		public boolean getAllFromPath (File file) {
+			boolean got = true;
+			
+			if (file.isDirectory ()) {
+				for (File tmp: file.listFiles ()) {
+					String name = tmp.getName ();
+					
+					if (tmp.isDirectory ()) {
+						if (!this.packages.containsKey (name)) {
+							this.packages.put (name, new Node (this));
+						}
+						
+						this.packages.get (name).getAllFromPath (tmp);
+					} else if (tmp.isFile ()) {
+						if (this.files.containsKey (name)) {
+							System.out.println ("[WARNING] File from `" + tmp.getAbsolutePath () 
+													+ "` is already added to " + file.getName ()
+													+ " ... override it");
+						}
+						
+						this.files.put (name, tmp.getAbsolutePath ());
+					} else {
+						System.out.println ("[ERROR] Unexpected error :(");
+						got = false;
+					}
+				}
+			}
+			
+			return got;
 		}
 	}
 	

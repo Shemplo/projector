@@ -429,7 +429,20 @@ public class Assembler {
 										variables.remove (value);
 										pathes.remove    (value);
 									} else {
-										
+										if (PackageTree.checkPath (value)) {
+											PackageTree tree = new PackageTree ();
+											
+											if (tree.buildTreeFromPath (value, line)) {
+												pathes.get (variable).addTree (tree, to);
+											} else {
+												continue assembler;
+											}
+										} else {
+											System.out.println ("[ERROR] Invalid source path `" + value 
+																	+ "` given in line " 
+																	+ line + " ... ADDING FAILED");
+											continue assembler;
+										}
 									}
 									//STOP
 								}
