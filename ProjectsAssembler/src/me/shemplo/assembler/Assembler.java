@@ -319,6 +319,38 @@ public class Assembler {
 											to = constantsReader.putConstants (to, line);
 											to = to.toLowerCase ();
 											
+											int pointer = -1;
+											for (int j = 0; j < to.length (); j ++) {
+												char symbol = to.charAt (j);
+												
+												if (symbol == '/' || symbol == '\\') {
+													pointer = j;
+													break;
+												}
+											}
+											
+											if (pointer == -1) {
+												if (variable.equals (to) || to.equals (".")) {
+													to = "";
+												} else {
+													System.out.println ("[ERROR] Invalid id name given `" + to 
+																			+ "` in local path in line " + line
+																			+ " ... ADDING FAILEDa");
+													continue assembler;
+												}
+											} else {
+												String root = to.substring (0, pointer);
+												if (variable.equals (root) || root.equals (".")) {
+													to = to.substring (pointer + 1);
+												} else {
+													System.out.println ("[ERROR] Invalid id name given `" + root 
+															+ "` in local path in line " + line
+															+ " (`" + variable + "` expected)"
+															+ " ... ADDING FAILED");
+													continue assembler;
+												}
+											}
+											
 											if (!PackageTree.checkPath (to)) {
 												System.out.println ("[ERROR] Invalid source path `" + to 
 																		+ "` given in line " 
@@ -389,6 +421,16 @@ public class Assembler {
 									
 									root.addFile (toLocal, fileName, value);
 								} else if (itype == Types.PACKAGE) {
+									if (pathes.containsKey (value)) {
+										PackageTree tree = pathes.get (variable);
+										tree.addTree (pathes.get (value), to);
+										
+										// IMPORTANT //
+										variables.remove (value);
+										pathes.remove    (value);
+									} else {
+										
+									}
 									//STOP
 								}
 							} else {
