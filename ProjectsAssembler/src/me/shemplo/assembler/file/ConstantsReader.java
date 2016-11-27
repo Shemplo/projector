@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,10 +18,12 @@ public class ConstantsReader {
 	private FileReader     file;
 	private BufferedReader reader;
 	
+	private HashSet <String>         system;
 	private HashMap <String, String> consts;
 	
 	public ConstantsReader () {
 		consts = new HashMap <> ();
+		system = new HashSet <> ();
 		_addDefaultConstants ();
 	}
 	
@@ -30,6 +33,7 @@ public class ConstantsReader {
 		if (file != null) {
 			reader = new BufferedReader (file);
 			consts = new HashMap <>     ();
+			system = new HashSet <>     ();
 			
 			try {
 				_addDefaultConstants ();
@@ -67,13 +71,26 @@ public class ConstantsReader {
 			realPath = realPath.substring (1);
 		}
 		
-		consts.put ("SRC_DIR", realPath + "/src");
-		consts.put ("ASSEMBLER_DIR", realPath + "/assembler");
+		final String SRC_DIR = "SRC_DIR";
+		consts.put (SRC_DIR, realPath + "/src");
+		system.add (SRC_DIR);
+		
+		final String ASSEMBLER_DIR = "ASSEMBLER_DIR";
+		consts.put (ASSEMBLER_DIR, realPath + "/assembler");
+		system.add (ASSEMBLER_DIR);
 		//consts.put ("ASSEMBLER_DIR", "Hello");
 		
-		consts.put ("SANDBOX_DIR", realPath + "/assembler/sandbox");
-		consts.put ("TARGET_DIR", realPath + "/assembler/target");
-		consts.put ("LOG_DIR", realPath + "/assembler/logs");
+		final String SANDBOX_DIR = "SANDBOX_DIR";
+		consts.put (SANDBOX_DIR, realPath + "/assembler/sandbox");
+		system.add (SANDBOX_DIR);
+		
+		final String TARGET_DIR = "TARGET_DIR";
+		consts.put (TARGET_DIR, realPath + "/assembler/target");
+		system.add (TARGET_DIR);
+		
+		final String LOGS_DIR = "LOGS_DIR";
+		consts.put (LOGS_DIR, realPath + "/assembler/logs");
+		system.add (LOGS_DIR);
 	}
 	
 	private void _parseConstants () throws IOException {
@@ -100,6 +117,7 @@ public class ConstantsReader {
 			String operator = commands [1];
 			String value    = commands [2];
 			
+			boolean systemConst = false;
 			boolean nconstsFlag = false;
 			if (nconst.length () > 3) {
 				if (nconst.charAt (0) == '$') {
@@ -116,7 +134,27 @@ public class ConstantsReader {
 								nconst      = name;
 							} else {
 								System.out.println ("[ERROR] Constant `" + name + "` is already"
-														+ "registerd. Line: " + line + " ... ignore it");
+														+ " registerd. Line: " + line + " ... ignore it");
+							}
+						} else {
+							System.out.println ("[ERROR] Invalid character in constant name `" + nconst
+													+ "` in line " + line + " ... ignore it");
+						}
+					} else if (nconst.charAt (1) == '!') {
+						String name = nconst.substring (2).toUpperCase ();
+						
+						String mask = "^([A-Z0-9\\_]+)$";
+						Pattern pat = Pattern.compile (mask);
+						
+						Matcher matcher = pat.matcher (name.trim ());
+						if (matcher.matches ()) {
+							if (system.contains (name)) {
+								nconstsFlag = true;
+								systemConst = true;
+								nconst      = name;
+							} else {
+								System.out.println ("[ERROR] Constant `" + name + "` is not found"
+														+ " in reserved. Line: " + line + " ... ignore it");
 							}
 						} else {
 							System.out.println ("[ERROR] Invalid character in constant name `" + nconst
@@ -124,7 +162,7 @@ public class ConstantsReader {
 						}
 					} else {
 						System.out.println ("[ERROR] Declaration of new constant"
-												+ "should have operator `+` in line " + line
+												+ "should have operator `+` or `!` in line " + line
 												+ " ... ignore it");
 					}
 				} else {
@@ -176,7 +214,10 @@ public class ConstantsReader {
 			}
 			
 			String finalValue = putConstants (value, line);
-			if (finalValue != null) { consts.put (nconst, finalValue); }
+			if (finalValue != null) {
+				consts.put (nconst, finalValue);
+				if (systemConst) { system.remove (nconst); }
+			}
 		} else {
 			System.out.println ("[ERROR] Not enough argument for creating constant"
 					+ " in line " + line + " ... ignore command");

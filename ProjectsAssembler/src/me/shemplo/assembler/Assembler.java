@@ -28,6 +28,7 @@ public class Assembler {
 	private boolean getPropertiesFileStatus = false;
 	private boolean readInstructionsStatus  = false;
 	private boolean runInstructionsStatus   = false;
+	private boolean buildingSandboxStatus   = false;
 	
 	private int constsReaderLine = 0;
 	
@@ -237,7 +238,8 @@ public class Assembler {
 		}
 	}
 	
-	private HashMap <String, PackageTree> pathes;
+	private HashMap <String, PackageTree>              pathes;
+	private HashMap <String, HashMap <String, String>> manifests;
 	
 	public void assemble () {
 		if (showDebug) { System.out.println ("[DEBUG] Starting assembly..."); }
@@ -264,9 +266,9 @@ public class Assembler {
 						
 						if (action.equals ("+") || action.equals ("import")) {
 							if (commands.length >= 3) {
-								Types itype    = Types.UNKNOWN;
-								String value   = "";
-								String to      = "";
+								Types itype  = Types.UNKNOWN;
+								String value = "";
+								String to    = "";
 								
 								if (commands.length >= 3) {
 									String string  = commands [2];
@@ -275,7 +277,6 @@ public class Assembler {
 									Types tempType = _fetchType (string);
 									
 									if (tempType != null) {
-										System.out.println (variable + " " + action + " " + tempType);
 										itype = tempType;
 										typeGiven = true;
 									} else {
@@ -316,8 +317,6 @@ public class Assembler {
 										string = commands [3 + (typeGiven ? 1 : 0)];
 										if (string.equals ("to")) {
 											to = commands [4 + (typeGiven ? 1 : 0)];
-											to = constantsReader.putConstants (to, line);
-											to = to.toLowerCase ();
 											
 											int pointer = -1;
 											for (int j = 0; j < to.length (); j ++) {
@@ -344,9 +343,9 @@ public class Assembler {
 													to = to.substring (pointer + 1);
 												} else {
 													System.out.println ("[ERROR] Invalid id name given `" + root 
-															+ "` in local path in line " + line
-															+ " (`" + variable + "` expected)"
-															+ " ... ADDING FAILED");
+																			+ "` in local path in line " + line
+																			+ " (`" + variable + "` expected)"
+																			+ " ... ADDING FAILED");
 													continue assembler;
 												}
 											}
@@ -357,6 +356,9 @@ public class Assembler {
 																		+ line + " ... ADDING FAILED");
 												continue assembler;
 											}
+											
+											to = constantsReader.putConstants (to, line);
+											to = to.toLowerCase ();
 										} else {
 											System.out.println ("[ERROR] Action `" + string + "` is not supported"
 																	+ " in line " + line + " ... ADDING FAILED");
@@ -393,9 +395,13 @@ public class Assembler {
 									break assembler;
 								} 
 								
+								if (showDebug) {
+									System.out.println ("[DEBUG] Value: " + value + " (type " + itype + ")");
+								}
+								
 								if (itype == Types.UNKNOWN) {
 									System.out.println ("[ERROR] Unknown type given `" + commands [2]
-											+ "` in line " + line + " ... PARSE FAILED");
+															+ "` in line " + line + " ... PARSE FAILED");
 									
 									continue assembler;
 								} else if (itype == Types.MANIFEST) {
@@ -444,7 +450,6 @@ public class Assembler {
 											continue assembler;
 										}
 									}
-									//STOP
 								}
 							} else {
 								System.out.println ("[ERROR] Not enough arguments for command"
@@ -454,6 +459,39 @@ public class Assembler {
 								wasStopped = true;
 								break assembler;
 							}
+						} else if (action.equals ("set")) {
+							if (commands.length >= 4) {
+								if (commands.length > 4) {
+									System.out.println ("[WARNING] Unexpected symbols `" + commands [4] + "` found "
+															+ "near command `" + action + "` in line " + line
+															+ " ... ignore them");
+								}
+								
+								Types itype = _fetchType (commands [2]);
+								String name = commands [3];
+								
+								if (itype == null) {
+									/* IT'S IMPOSSIBLE */
+									/*   DO NOT SEE   */
+								} else if (itype == Types.UNKNOWN) {
+									System.out.println ("[ERROR] Unknown type given `" + commands [2]
+															+ "` in line " + line + " ... PARSE FAILED");
+									continue assembler;
+								} else if (itype == Types.MANIFEST) {
+									_registerVariable (new String [] {"create", "<manifest>", name}, line);
+									
+									manifests.put (name, new HashMap <> ());
+									manifests.get (name).put ("__PARENT__", variable);
+								}
+							} else {
+								System.out.println ("[ERROR] Not enough arguments for command"
+														+ " in line " + line + " ... ignore command");
+								System.out.println ("[FORMAT] This command format: [id name] set <[type]> [id name2]");
+							}
+						} else {
+							System.out.println ("[ERROR] Requested method `" + action
+													+ "` is not supported in line " + line
+													+ " ... ighore it");
 						}
 					} else {
 						System.out.println ("[ERROR] Not enough argument for command"
@@ -463,6 +501,9 @@ public class Assembler {
 						wasStopped = true;
 						break assembler;
 					}
+				} else if (type == Types.MANIFEST) {
+					
+					//STOP
 				}
 			} else {
 				System.out.println ("[ERROR] Variable `" + variable
@@ -476,6 +517,10 @@ public class Assembler {
 		if (!wasStopped) {
 			runInstructionsStatus = true;
 		}
+	}
+	
+	public void buildSandbox () {
+		if (showDebug) { System.out.println ("[DEBUG] Starting building sandbox..."); }
 	}
 	
 	private Sections _fetchSection (String command) {
@@ -801,7 +846,9 @@ public class Assembler {
 	
 	/**
 	 * getPropertiesFileStatus <br />
-	 * readInstructionsStatus
+	 * readInstructionsStatus  <br />
+	 * runInstructionsStatus   <br />
+	 * buildingSandboxStatus   <br />
 	 * */
 	public boolean getStatus (String status) {
 		if (status.equals ("getPropertiesFileStatus")) {
@@ -810,6 +857,8 @@ public class Assembler {
 			return readInstructionsStatus;
 		} else if (status.equals ("runInstructionsStatus")) {
 			return runInstructionsStatus;
+		} else if (status.equals ("buildingSandboxStatus")) {
+			return buildingSandboxStatus;
 		}
 		
 		System.out.println ("[DEBUG] Status `" + status + "` not found");

@@ -16,6 +16,9 @@ public class ProjectsAssembler {
 		if (!assembler.getStatus ("readInstructionsStatus")) { return; }
 		
 		assembler.assemble ();
+		if (!assembler.getStatus ("runInstructionsStatus")) { return; }
+		
+		assembler.buildSandbox ();
 	}
 	
 }

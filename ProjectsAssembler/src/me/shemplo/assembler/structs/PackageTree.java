@@ -20,7 +20,9 @@ public class PackageTree {
 			root.addPackagePath (path);
 			added = true;
 			
-			System.out.println ("[DEBUG] Path `" + path + "` was built successfully");
+			if (path != null && path.length () != 0) {
+				System.out.println ("[DEBUG] Path `" + path + "` was built successfully");
+			}
 		} else {
 			System.out.println ("[ERROR] Invalid path `" + path 
 									+ "` given ... ADDING FAILED");
@@ -187,7 +189,7 @@ public class PackageTree {
 						String rest = path.substring (pointer + 1);
 						return node._getNode (rest);
 					} else {
-						return this;
+						return node;
 					}
 				} else {
 					System.out.println ("[ERROR] Package `" + to + "` not found"
