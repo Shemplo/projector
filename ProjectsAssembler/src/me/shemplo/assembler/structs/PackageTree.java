@@ -1,15 +1,26 @@
 package me.shemplo.assembler.structs;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
+import me.shemplo.assembler.file.ConstantsReader;
 
 public class PackageTree {
 	
 	private Node root;
 	private String manifest;
+	private ConstantsReader cr;
 	
 	public PackageTree () {
 		root = new Node ();
@@ -22,6 +33,11 @@ public class PackageTree {
 	
 	public String manifest (){
 		return manifest;
+	}
+	
+	public void setConstants (ConstantsReader cr) {
+		assert cr != null;
+		this.cr = cr;
 	}
 	
 	public boolean addPackagePath (String path) {
@@ -333,6 +349,104 @@ public class PackageTree {
 			return got;
 		}
 		
+		private boolean _isJar (File jar) {
+			boolean isJar = false;
+			
+			try {
+				ZipFile zip = new ZipFile (jar);
+				zip.close ();
+				
+				isJar = true;
+			} catch (Exception e) {}
+			
+			return isJar;
+		}
+		
+		private PackageTree _unpackJar (File jar) {
+			PackageTree result = null;
+			
+			try {
+				//Unpacking jar
+				
+				ZipFile zip = new ZipFile (jar, Charset.forName ("CP866"));
+				Enumeration <?> entries = zip.entries ();
+				
+				String sandbox = cr.putConstants ("$.SANDBOX_DIR", 0);
+				File unpack = new File (sandbox + "/unpacked_jar_" + jar.getName ());
+				unpack.mkdirs ();
+				
+				File         file;
+				File         directory;
+				InputStream  input;
+				OutputStream output;
+				BufferedOutputStream out;
+				
+				while (entries.hasMoreElements ()) {
+					ZipEntry entry = (ZipEntry) entries.nextElement ();
+					
+					if (entry.isDirectory ()) {
+						new File (unpack.getAbsolutePath (), entry.getName ()).mkdirs ();
+					} else {
+						input = zip.getInputStream (entry);
+						
+						String name = entry.getName ();
+						String path = _getPathToFile (name);
+						if (!name.equals (path)) {
+							directory = new File (unpack.getAbsolutePath ()
+													+ File.separatorChar + path);
+							directory.mkdirs ();
+						}
+						
+						file = new File (unpack.getAbsolutePath (), entry.getName ());
+						output = new FileOutputStream (file);
+						out = new BufferedOutputStream (output);
+						
+						byte [] buffer = new byte [1024];
+						int length = 0;
+						
+						while ((length = input.read (buffer)) >= 0) {
+							out.write (buffer, 0, length);
+						}
+						
+						input.close ();
+						out.close ();
+						output.close ();
+					}
+				}
+				
+				zip.close ();
+				
+				//Building tree
+				
+				result = new PackageTree ();
+				result.buildTreeFromPath (unpack.getAbsolutePath (), 0);
+			} catch (Exception e) {
+				System.out.println ("[ERROR] Failed to parse archive file "
+										+ "... ADDING FAILED");
+			}
+			
+			return result;
+		}
+		
+		private String _getPathToFile (String path) {
+			int pointer = -1;
+			
+			for (int i = path.length () - 1; i >= 0; i --) {
+				char symbol = path.charAt (i);
+				
+				if (symbol == '/' || symbol == '\\') {
+					pointer = i;
+					break;
+				}
+			}
+			
+			if (pointer != -1) {
+				return path.substring (0, pointer);
+			}
+			
+			return path;
+		}
+		
 		public void buildDirectory (File root) throws Exception {
 			packages.forEach ((key, value) -> {
 				File child = new File (root.getAbsolutePath () + File.separatorChar + key);
@@ -348,8 +462,17 @@ public class PackageTree {
 				
 				if (file.exists ()) {
 					File dest = new File (root.getAbsolutePath () + File.separatorChar + key);
-					try                 { Files.copy (file.toPath (), dest.toPath ()); } 
-					catch (Exception e) { return; }
+					
+					if (_isJar (file)) {
+						System.out.println ("[LOG] File `" + file.getName () 
+												+ "` recognized as JAR-file ... unpack it");
+						
+						PackageTree jar = _unpackJar (file);
+						if (jar != null) { jar.buildDirectoryFromTree (dest.getParentFile ()); }
+					} else {
+						try                 { Files.copy (file.toPath (), dest.toPath ()); } 
+						catch (Exception e) { return; }
+					}
 				} else {
 					System.out.println ("[ERROR] File `" + key + "` does not exist on path `" 
 											+ value + "` ... BUILD FAILED");

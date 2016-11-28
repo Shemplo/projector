@@ -269,6 +269,7 @@ public class Assembler {
 				if (type == Types.PACKAGE) {
 					if (!pathes.containsKey (variable)) {
 						pathes.put (variable, new PackageTree ());
+						pathes.get (variable).setConstants (constantsReader);
 					}
 					
 					if (commands.length >= 2) {
@@ -584,7 +585,7 @@ public class Assembler {
 		for (int i = 0; i < pack.size (); i ++) {
 			String name = pack.get (i);
 			
-			File root = new File (sandBox.getAbsolutePath () + File.separatorChar + name);
+			File root = new File (target.getAbsolutePath () + File.separatorChar + name);
 			root.mkdir ();
 			
 			if (showDebug) { System.out.println ("[DEBUG] Package `" + name + "` is created"); }
