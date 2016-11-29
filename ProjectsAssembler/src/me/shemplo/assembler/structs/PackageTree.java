@@ -356,7 +356,22 @@ public class PackageTree {
 				ZipFile zip = new ZipFile (jar);
 				zip.close ();
 				
-				isJar = true;
+				int pointer = -1;
+				String name = jar.getName ();
+				for (int i = name.length () - 1; i >= 0; i --) {
+					if (name.charAt (i) == '.') {
+						pointer = i;
+						break;
+					}
+				}
+				
+				if (pointer != -1
+						&& name.substring (pointer + 1).equals ("jar")) {
+					isJar = true;
+				} else {
+					System.out.println ("[DEBUG] File `" + name + "` looks like"
+											+ " archive but not a JAR-file ... adding it");
+				}
 			} catch (Exception e) {}
 			
 			return isJar;
@@ -367,7 +382,6 @@ public class PackageTree {
 			
 			try {
 				//Unpacking jar
-				
 				ZipFile zip = new ZipFile (jar, Charset.forName ("CP866"));
 				Enumeration <?> entries = zip.entries ();
 				
@@ -391,6 +405,10 @@ public class PackageTree {
 						
 						String name = entry.getName ();
 						String path = _getPathToFile (name);
+						
+						//Ignoring library manifest file
+						if (path.equals ("META-INF")) { continue; }
+						
 						if (!name.equals (path)) {
 							directory = new File (unpack.getAbsolutePath ()
 													+ File.separatorChar + path);
@@ -417,7 +435,6 @@ public class PackageTree {
 				zip.close ();
 				
 				//Building tree
-				
 				result = new PackageTree ();
 				result.buildTreeFromPath (unpack.getAbsolutePath (), 0);
 			} catch (Exception e) {

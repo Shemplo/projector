@@ -1,10 +1,13 @@
 package me.shemplo.assembler;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -585,7 +588,7 @@ public class Assembler {
 		for (int i = 0; i < pack.size (); i ++) {
 			String name = pack.get (i);
 			
-			File root = new File (target.getAbsolutePath () + File.separatorChar + name);
+			File root = new File (target.getAbsolutePath () + File.separatorChar + "package_" + name);
 			root.mkdir ();
 			
 			if (showDebug) { System.out.println ("[DEBUG] Package `" + name + "` is created"); }
@@ -594,7 +597,58 @@ public class Assembler {
 				break builder;
 			}
 			
+			String manifest = pathes.get (name).manifest ();
 			
+			if (manifests.containsKey (manifest)) {
+				File metaInf = new File (root, "META-INF");
+				if (metaInf.exists ()) {
+					File manf = new File (metaInf, "MANIFEST.MF");
+					if (manf.exists ()) {
+						manf.delete ();
+					}
+				}
+				
+				metaInf.mkdir ();
+				File manf = new File (metaInf, "MANIFEST.MF");
+				
+				try {
+					FileOutputStream output = new FileOutputStream (manf);
+					BufferedOutputStream out = new BufferedOutputStream (output);
+					
+					Map <String, String> properties = manifests.get (manifest);
+					
+					final String vesion = "Manifest-Version";
+					if (properties.containsKey (vesion)) {
+						byte [] value = (vesion + ": " + properties.get (vesion)).getBytes ();
+						out.write (value);
+						out.write (System.lineSeparator ().getBytes ());
+					}
+					
+					final String main = "Main-Class";
+					if (properties.containsKey (main)) {
+						byte [] value = (main + ": " + properties.get (main)).getBytes ();
+						out.write (value);
+						out.write (System.lineSeparator ().getBytes ());
+					}
+					
+					properties.forEach ((key, value) -> {
+						if (!key.equals (vesion) && !key.equals (main)) {
+							byte [] val = (key + ": " + value).getBytes ();
+							try {
+								out.write (val);
+								out.write (System.lineSeparator ().getBytes ());
+							} catch (Exception e) {}
+						}
+					});
+					
+					out.close ();
+					output.close ();
+				} catch (Exception e) {}
+			} else {
+				System.out.println ("[ERROR] Required manifest variable `" + manifest 
+										+ "` is not found ... BUILDING FAILED");
+				break builder;
+			}
 		}
 	}
 	
