@@ -76,7 +76,7 @@ public class Assembler {
 			this.propertiesFileName = fileName;
 			propertiesReader.loadFile (propertiesFileName);
 		} catch (FileNotFoundException fne) {
-			System.out.println ("[Assembler] Exceprion: `" 
+			System.out.println ("[Assembler] Exception: `" 
 					+ fne.getMessage () 
 					+ "` in method `setPropertiesFileName`");
 			getPropertiesFileStatus = false;
@@ -614,7 +614,6 @@ public class Assembler {
 				try {
 					FileOutputStream output = new FileOutputStream (manf);
 					BufferedOutputStream out = new BufferedOutputStream (output);
-					
 					Map <String, String> properties = manifests.get (manifest);
 					
 					final String vesion = "Manifest-Version";
@@ -632,7 +631,9 @@ public class Assembler {
 					}
 					
 					properties.forEach ((key, value) -> {
-						if (!key.equals (vesion) && !key.equals (main)) {
+						if (key.equals ("__PARENT__")) {
+							//Stub to skip a system parameter
+						} else if (!key.equals (vesion) && !key.equals (main)) {
 							byte [] val = (key + ": " + value).getBytes ();
 							try {
 								out.write (val);
@@ -644,9 +645,14 @@ public class Assembler {
 					out.close ();
 					output.close ();
 				} catch (Exception e) {}
-			} else {
+			} else if (manifest != null) {
 				System.out.println ("[ERROR] Required manifest variable `" + manifest 
 										+ "` is not found ... BUILDING FAILED");
+				break builder;
+			}
+			
+			if (!pathes.get (name).packJar (root, root.getName (), (i + 1) + ".zip")) {
+				System.out.println ("cscsdc");
 				break builder;
 			}
 		}

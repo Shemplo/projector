@@ -2,6 +2,7 @@ package me.shemplo.assembler.structs;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,6 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 import me.shemplo.assembler.file.ConstantsReader;
 
@@ -140,7 +142,7 @@ public class PackageTree {
 			path = path.substring (0, path.length () - 1);
 		}
 		
-		String  mask = "^([^\\.][à-ÿÀ-ßa-zA-Z0-9\\\\\\/\\_\\.\\%\\:]+)$";
+		String  mask = "^([^\\.][à-ÿÀ-ßa-zA-Z0-9\\\\\\/\\_\\.\\%\\:\\$]+)$";
 		Pattern pattern = Pattern.compile (mask);
 		
 		Matcher matcher = pattern.matcher (path);
@@ -183,6 +185,104 @@ public class PackageTree {
 			System.out.println (e.getMessage ());
 			return false;
 		}
+	}
+	
+	public boolean packJar (File source, String directory, String name) {
+		boolean packed = false;
+		
+		try {
+			String to = cr.putConstants ("$.ASSEMBLER_DIR", 0);
+			File file = new File (to + File.separatorChar + name);
+			FileOutputStream     fileStream = new FileOutputStream (file);
+			BufferedOutputStream outStream  = new BufferedOutputStream (fileStream);
+			ZipOutputStream      zipStream  = new ZipOutputStream  (outStream);
+			zipStream.setLevel (9);
+			
+			if (source.isDirectory ()) {
+				for (File tmp: source.listFiles ()) {
+					if (tmp.isDirectory () 
+							&& tmp.getName ().equals ("META-INF")) {
+						for (File manf: tmp.listFiles ()) {
+							if (manf.isFile () 
+									&& manf.getName ().equals ("MANIFEST.MF")) {
+								zipStream.putNextEntry (new ZipEntry ("META-INF/MANIFEST.MF"));
+								FileInputStream manfStream = new FileInputStream (manf);
+								
+								byte [] buffer = new byte [1024];
+								int length = 0;
+								
+								while ((length = manfStream.read (buffer)) >= 0) {
+									zipStream.write (buffer, 0, length);
+								}
+								
+								zipStream.closeEntry ();
+								manfStream.close     ();
+								break;
+							}
+						}
+						
+						break;
+					}
+				}
+			}
+			
+			packed = _packJar (source, directory, zipStream);
+			
+			zipStream.close ();
+			fileStream.close ();
+		} catch (Exception e) {
+			e.printStackTrace ();
+		}
+		
+		return packed;
+	}
+	
+	private boolean _packJar (File root, String directory, ZipOutputStream zos) throws Exception {
+		boolean packed = false;
+		
+		if (root.isDirectory ()) {
+			if (root.getName ().equals ("META-INF")) {
+				return true;
+			}
+			
+			for (File file: root.listFiles ()) {
+				packed = _packJar (file, directory, zos);
+			}
+		} else {
+			FileInputStream fileStream = new FileInputStream (root);
+			String targetPath = cr.putConstants ("$.TARGET_DIR", 0);
+			String shortPath  = root.getAbsolutePath ()
+									.substring (targetPath.length  () 
+												+ directory.length () 
+												+ 2);
+			
+			//Converting `\` chars to `/` chars
+			//Because the first is not recognized by archive
+			//as directories separator char
+			StringBuilder optimizedPath = new StringBuilder ();
+			for (int i = 0; i < shortPath.length (); i ++) {
+				char symbol = shortPath.charAt (i);
+				
+				if (symbol == File.separatorChar) { optimizedPath.append ("/"); } 
+				else                              { optimizedPath.append (symbol); }
+			}
+			
+			shortPath = optimizedPath.toString ();
+			zos.putNextEntry (new ZipEntry (shortPath));
+			
+			byte [] buffer = new byte [1024];
+			int length;
+			
+			while ((length = fileStream.read (buffer)) >= 0) {
+				zos.write (buffer, 0, length);
+			}
+			
+			zos.closeEntry   ();
+			fileStream.close ();
+			packed = true;
+		}
+		
+		return packed;
 	}
 	
 	public static boolean clearDirectory (File rootDir, int line) {
